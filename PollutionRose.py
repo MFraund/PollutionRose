@@ -28,6 +28,17 @@ def PollutionRose(windDirection, windSpeed, extraMeasure, numBins = 100, rotate 
     ws = windSpeed
     pm = extraMeasure
     
+    #%% Input Checking
+    if rotate:
+        wd = (wd + 90) %360
+    
+    if len(numBins) == 1:
+        numBins_wd = numBins
+        numBins_ws = numBins
+    elif len(numBins) == 2:
+        numBins_wd = numBins[0]
+        numBins_ws = numBins[1]
+    
     #%%
     
     (H2d, wd_edges, ws_edges) = np.histogram2d(wd, ws, bins = numBins)
@@ -52,12 +63,11 @@ def PollutionRose(windDirection, windSpeed, extraMeasure, numBins = 100, rotate 
     
     
     #%% stackoverflow bit2  pretty good
-    if rotate:
-        wd = (wd + 90) %360
+    
     
     wd_rad = np.radians(wd)
     
-    WD, WS = np.meshgrid(np.linspace(0, 2*np.pi, 36), np.linspace(min(ws), max(ws), numBins ))
+    WD, WS = np.meshgrid(np.linspace(0, 2*np.pi, numBins_wd), np.linspace(min(ws), max(ws), numBins_ws ))
     Z = griddata((wd_rad, ws), pm, (WD, WS), method='linear')
     
     fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
