@@ -20,68 +20,112 @@ from math import radians, degrees, pi
 import csv
 from scipy.interpolate import griddata
 import addcopyfighandler
+import time
+from tqdm import tqdm
 
 
-def PollutionRose(windDirection, windSpeed, extraMeasure, numBins = 100, rotate = True, CScale = 'Log'):
+def PollutionRose(windDirection, windSpeed, pollutionVec,
+                  wslim:float or None = [0, 10],
+                  vlim:float or None = [None, None],
+                  pThresh:float or None = 0,
+                  numBins = 100,
+                  interpolation_method:str = 'nearest',
+                  rotate:bool = True,
+                  CScale:str = 'Log'):
     #%% Making inputs easier
     wd = windDirection
     ws = windSpeed
-    pm = extraMeasure
+    pm = pollutionVec
     
     #%% Input Checking
     if rotate:
         wd = (wd + 90) %360
     
-    if len(numBins) == 1:
+    if isinstance(numBins,int):
         numBins_wd = numBins
         numBins_ws = numBins
+        
+    elif len(numBins) == 1:
+        numBins_wd = numBins
+        numBins_ws = numBins
+        
     elif len(numBins) == 2:
         numBins_wd = numBins[0]
         numBins_ws = numBins[1]
+        
+    vmin = vlim[0]
+    vmax = vlim[1]
+    
+    if wslim[0]== None:
+        wsmin = min(ws)
+        
+    if wslim[1]== None:
+        wsmax = max(ws)
+        
+    wsmin = wslim[0]
+    wsmax = wslim[1]
     
     #%%
     
     (H2d, wd_edges, ws_edges) = np.histogram2d(wd, ws, bins = numBins)
-    wd_idx = np.digitize(wd, wd_edges)
-    ws_idx = np.digitize(ws, ws_edges)
+    WD, WS = np.meshgrid(np.linspace(0, 2*np.pi, numBins_wd), np.linspace(min(ws), max(ws), numBins_ws ))
+    wd_rad = np.radians(wd)
+    wd_idx = np.digitize(wd_rad, WD[0,:])
+    ws_idx = np.digitize(ws, WS[:,0])
     
-    wd_idx[wd_idx==numBins+1] = numBins
-    ws_idx[ws_idx==numBins+1] = numBins
+    wd_idx -= 1
+    ws_idx -= 1
+    # wd_idx[wd_idx==numBins] = numBins-1
+    # ws_idx[ws_idx==numBins] = numBins-1
     
     Hnew = np.zeros(H2d.shape)
     Hcount = np.zeros(H2d.shape)
     
-    for i, v in enumerate(pm):
-        wd_val = wd_idx[i]-1
-        ws_val = ws_idx[i]-1
-        Hnew[wd_val, ws_val] = Hnew[wd_val, ws_val] + v
-        Hcount[wd_val, ws_val] += 1
     
+    Hnew[ws_idx, wd_idx] = Hnew[ws_idx, wd_idx] + pm
     
-    Hnew = np.divide(Hnew,Hcount)
-    Hnew = np.nan_to_num(Hnew)
+    if pThresh != None:
+        Hnew[Hnew <= pThresh] = np.nan;
     
+    # wd_edges_rad = np.radians(wd_edges)
+    # wdmesh, wsmesh = np.meshgrid(wd_edges_rad, ws_edges)
     
-    #%% stackoverflow bit2  pretty good
-    
-    
-    wd_rad = np.radians(wd)
-    
-    WD, WS = np.meshgrid(np.linspace(0, 2*np.pi, numBins_wd), np.linspace(min(ws), max(ws), numBins_ws ))
-    Z = griddata((wd_rad, ws), pm, (WD, WS), method='linear')
-    
-    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    fig, ax = plt.subplots(subplot_kw={'projection':'polar'})
     cmap = plt.get_cmap('plasma')
     cmap.set_under('none')
-    img = ax.pcolormesh(WD, WS, Z, cmap=cmap)
+    img = ax.pcolormesh(WD, WS, Hnew, cmap = cmap)
+    plt.ylim([wsmin, wsmax])
     if CScale == 'Log':
-        img.norm = mpl.colors.LogNorm()
+        img.norm = mpl.colors.LogNorm(vmin = vmin, vmax = vmax)
     elif CScale == 'Lin':
         pass
     plt.colorbar(img)
     plt.show()
     
     return ax
+    
+    #%% stackoverflow bit2  pretty good
+    
+    
+    # wd_rad = np.radians(wd)
+    
+    # WD, WS = np.meshgrid(np.linspace(0, 2*np.pi, numBins_wd), np.linspace(min(ws), max(ws), numBins_ws ))
+    # Z = griddata((wd_rad, ws), pm, (WD, WS), method=interpolation_method)
+    # Z[Z==0] = np.nan
+    
+    # fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    # cmap = plt.get_cmap('plasma')
+    # cmap.set_under('none')
+    # img = ax.pcolormesh(WD, WS, Z, cmap=cmap)
+    # plt.ylim([wsmin, wsmax])
+    # if CScale == 'Log':
+    #     img.norm = mpl.colors.LogNorm(vmin = vmin, vmax = vmax)
+    # elif CScale == 'Lin':
+    #     pass
+    # plt.colorbar(img)
+    # plt.show()
+    
+    # return ax
 
 if __name__ == '__main__':
     #%% Pulling data
@@ -132,4 +176,8 @@ if __name__ == '__main__':
     wd = wd[:-1]
     ws = ws[:-1]
     
-    PollutionRose(wd, ws, pm10_sparse)
+    wd_test = np.array([0, 90, 180, 350])
+    ws_test = np.array([2, 6, 8, 10])
+    pm102 = np.array([5,20,40,50])
+    
+    PollutionRose(wd, ws, pm10_sparse, rotate = True, CScale = 'Log')
