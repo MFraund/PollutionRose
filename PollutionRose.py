@@ -98,7 +98,7 @@ def PollutionRose(windDirection, windSpeed, pollutionVec,
     if CScale == 'Log':
         img.norm = mpl.colors.LogNorm(vmin = vmin, vmax = vmax)
     elif CScale == 'Lin':
-        pass
+        img.norm = mpl.colors.Normalize(vmin = vmin, vmax = vmax)
     plt.colorbar(img)
     plt.show()
     
